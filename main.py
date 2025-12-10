@@ -9,22 +9,18 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 display = PicoGraphics(display=DISPLAY_INTERSTATE75_64X64, rotate=0)
-png = PNG(display)
 
 LON = -84.3895
 LAT = 33.7490
 ZOOM = 13
 
-W, H = 64
+W, H = 64, 64
 
-def load_secrets(WIFI_PASS=None, WIFI_SSID=None, MAPBOX_TOKEN=None):
+def load_secrets():
     # Assuming you have a file named 'secrets.json' in the same directory
-    data_from_file = []
     with open('secrets.json', 'r') as f:
         data_from_file = json.load(f)
-    WIFI_PASS = data_from_file['WIFI_PASS']
-    WIFI_SSID = data_from_file['WIFI_SSID']
-    MAPBOX_TOKEN = data_from_file['MAPBOX_TOKEN']
+    return data_from_file['WIFI_PASS'], data_from_file['WIFI_SSID'], data_from_file['MAPBOX_TOKEN']
 
 # Optional: a little LED indicator using onboard RGB if available
 # (Interstate board examples sometimes expose an RGB LED API; if not, ignore)
@@ -50,29 +46,29 @@ def build_static_image_url(lon, lat, zoom, w, h, token):
     )
     return url
 
-def download_map(url, filename):
+def download_map(url, filename, downloaded):
     response = requests.get(url)
     if response.status_code == 200 and response.content:
         data = response.content
         # write binary to file on the board
         with open(filename, "wb") as f:
             f.write(data)
-        complete = True
+        downloaded = True
     else:
-        print("Map fetch failed: ", response.status_code)
+        print("Map fetch failed: ", response.status_code, ", Downloaded: ", downloaded)
 
 def main():
     # Connect WiFi
-    WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN = ''
     UPDATE_INTERVAL = 300
     try:
-        load_secrets(WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN)
+        WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN = load_secrets()
         connect_wifi(WIFI_SSID, WIFI_PASS)
         MAP_FILENAME = "map.png"
-        png = PNG(None)
+        png = PNG(display)
         while True:
             url = build_static_image_url(LON, LAT, ZOOM, W, H, MAPBOX_TOKEN)
-            downloaded = download_map(url, MAP_FILENAME)
+            downloaded = False
+            download_map(url, MAP_FILENAME, downloaded)
             if not downloaded:
                 # Skip this iteration if download failed
                 return
