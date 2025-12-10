@@ -4,9 +4,6 @@ import urequests as requests
 from picographics import PicoGraphics, DISPLAY_INTERSTATE75_64X64
 from pngdec import PNG
 import json
-import logging
-
-logging.basicConfig(level=logging.INFO)
 
 display = PicoGraphics(display=DISPLAY_INTERSTATE75_64X64, rotate=0)
 
