@@ -1,17 +1,19 @@
 import network
 import time
 import urequests as requests
-from picographics import PicoGraphics, DISPLAY_INTERSTATE75_64X64
+from interstate75 import Interstate75, DISPLAY_INTERSTATE75_128X128
 from pngdec import PNG
 import json
 
-display = PicoGraphics(display=DISPLAY_INTERSTATE75_64X64, rotate=0)
+i75 = Interstate75(DISPLAY_INTERSTATE75_128X128, stb_invert=False)
+display = i75.display
+
+width = i75.width
+height = i75.height
 
 LON = -84.3895
 LAT = 33.7490
 ZOOM = 13
-
-W, H = 64, 64
 
 def load_secrets():
     # Assuming you have a file named 'secrets.json' in the same directory
@@ -58,22 +60,29 @@ def main():
     # Connect WiFi
     UPDATE_INTERVAL = 300
     try:
+        print('[MAIN] Loading secrets and connecting to WiFi')
         WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN = load_secrets()
         connect_wifi(WIFI_SSID, WIFI_PASS)
+        print('[MAIN] Connected to WiFi')
         MAP_FILENAME = "map.png"
         png = PNG(display)
+        print("[MAIN] Starting map download loop")
         while True:
-            url = build_static_image_url(LON, LAT, ZOOM, W, H, MAPBOX_TOKEN)
+            url = build_static_image_url(LON, LAT, ZOOM, width, height, MAPBOX_TOKEN)
+            print("[MAIN] Downloading map from URL: ", url)
             downloaded = False
             download_map(url, MAP_FILENAME, downloaded)
+            print("[MAIN] Map was downloaded: ", downloaded)
             if not downloaded:
                 # Skip this iteration if download failed
                 return
             if png.open_file(MAP_FILENAME):
+                print("[MAIN] Displaying map image")
                 png.decode(0, 0)
-                display.update()
+                i75.update()
             for _ in range(int(UPDATE_INTERVAL / 5)):
                 time.sleep(5)
+            print("[MAIN] nd of iteration, restarting loop")
     except Exception as e:
         print("Exception raised: ", e)
         return
