@@ -1,25 +1,21 @@
 import network
 import time
-import urequests as requests
-from interstate75 import Interstate75, DISPLAY_INTERSTATE75_128X128
-from pngdec import PNG
+import requests
+try:
+    from interstate75 import Interstate75, DISPLAY_INTERSTATE75_128X128
+except ImportError:
+    pass
+try:
+    from pngdec import PNG
+except ImportError:
+    pass
 import json
-
-i75 = Interstate75(DISPLAY_INTERSTATE75_128X128, stb_invert=False)
-display = i75.display
-
-width = i75.width
-height = i75.height
-
-LON = -84.3895
-LAT = 33.7490
-ZOOM = 13
 
 def load_secrets():
     # Assuming you have a file named 'secrets.json' in the same directory
     with open('secrets.json', 'r') as f:
         data_from_file = json.load(f)
-    return data_from_file['WIFI_PASS'], data_from_file['WIFI_SSID'], data_from_file['MAPBOX_TOKEN']
+    return data_from_file['WIFI_PASS'], data_from_file['WIFI_SSID'], data_from_file['MAPBOX_TOKEN'], data_from_file['STYLE_ID']
 
 # Optional: a little LED indicator using onboard RGB if available
 # (Interstate board examples sometimes expose an RGB LED API; if not, ignore)
@@ -37,16 +33,19 @@ def connect_wifi(ssid, password, timeout=20):
         time.sleep(0.5)
     return wlan
 
-def build_static_image_url(lon, lat, zoom, w, h, token):
+def build_static_image_url(style_id, lon, lat, zoom, w, h, token):
+    # https://api.mapbox.com/styles/v1/mapbox/streets-v12/
+    # static/-2.2129,51.8675,15,0/64x64?access_token=YOUR_MAPBOX_ACCESS_TOKEN
+    # Working example
     base = "https://api.mapbox.com/styles/v1"
-    style_path = "mapbox/streets-v11"
     url = "{}/{}/static/{:.6f},{:.6f},{}/{}x{}?access_token={}".format(
-        base, style_path, lon, lat, zoom, w, h, token
+        base, style_id, lon, lat, zoom, w, h, token
     )
     return url
 
-def download_map(url, filename, downloaded):
-    response = requests.get(url)
+def download_map(url, filename):
+    downloaded = False
+    response = requests.get(url, )
     if response.status_code == 200 and response.content:
         data = response.content
         # write binary to file on the board
@@ -55,23 +54,38 @@ def download_map(url, filename, downloaded):
         downloaded = True
     else:
         print("Map fetch failed: ", response.status_code, ", Downloaded: ", downloaded)
+    return downloaded
 
 def main():
     # Connect WiFi
     UPDATE_INTERVAL = 300
+    i75 = Interstate75(DISPLAY_INTERSTATE75_128X128, stb_invert=False)
+    display = i75.display
+
+    width = i75.width
+    height = i75.height
+
+    LON = -2.2129
+    LAT = 51.8675
+    ZOOM = 15
     try:
         print('[MAIN] Loading secrets and connecting to WiFi')
-        WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN = load_secrets()
+        WIFI_PASS, WIFI_SSID, MAPBOX_TOKEN, STYLE_ID = load_secrets()
         connect_wifi(WIFI_SSID, WIFI_PASS)
         print('[MAIN] Connected to WiFi')
         MAP_FILENAME = "map.png"
         png = PNG(display)
         print("[MAIN] Starting map download loop")
         while True:
-            url = build_static_image_url(LON, LAT, ZOOM, width, height, MAPBOX_TOKEN)
+            url = build_static_image_url(STYLE_ID,
+                                         LON,
+                                         LAT,
+                                         ZOOM,
+                                         width,
+                                         height,
+                                         MAPBOX_TOKEN)
             print("[MAIN] Downloading map from URL: ", url)
-            downloaded = False
-            download_map(url, MAP_FILENAME, downloaded)
+            downloaded = download_map(url, MAP_FILENAME)
             print("[MAIN] Map was downloaded: ", downloaded)
             if not downloaded:
                 # Skip this iteration if download failed
